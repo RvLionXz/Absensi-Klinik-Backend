@@ -3,14 +3,15 @@ const router = express.Router();
 const {
 	rekamAbsensi,
 	getAllAbsensi,
-	getAbsensiByUser,
 	getAbsensiStatusToday,
+	exportAbsensi,
 } = require("../controllers/absensiController");
 const { authenticateToken, isAdmin } = require("../middleware/authMiddleware");
 
 router.get("/status", authenticateToken, getAbsensiStatusToday);
 router.post("/", authenticateToken, rekamAbsensi);
+
 router.get("/", authenticateToken, isAdmin, getAllAbsensi);
-router.get("/:userId", authenticateToken, getAbsensiByUser);
+router.get("/export", authenticateToken, isAdmin, exportAbsensi);
 
 module.exports = router;
