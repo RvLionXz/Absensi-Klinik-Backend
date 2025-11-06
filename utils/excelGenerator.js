@@ -210,6 +210,7 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 		formula: `SUM(${totalHadirColLetter}2:${totalHadirColLetter}${
 			summaryRowNumber - 2
 		})`,
+		result: undefined,
 	};
 
 	return workbook;
