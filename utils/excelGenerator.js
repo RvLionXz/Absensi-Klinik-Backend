@@ -17,6 +17,8 @@ const COLORS = {
 	redFill: "FFFFC7CE",
 	redFont: "FF9C0006",
 	headerFill: "FFD3D3D3",
+	summaryFill: "FFF2F2F2",
+	whiteFill: "FFFFFFFF",
 };
 
 async function generateAttendanceReport(allUsers, attendanceData, month, year) {
@@ -150,7 +152,7 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 					cell.fill = {
 						type: "pattern",
 						pattern: "solid",
-						fgColor: { argb: COLORS.redFill },
+						fgColor: { argb: COLORS.whiteFill },
 					};
 				}
 			}
@@ -159,6 +161,56 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 			}
 		});
 	});
+
+	sheet.addRow([]);
+	const summaryRow = sheet.addRow({});
+	const summaryRowNumber = summaryRow.number;
+
+	sheet.mergeCells(`A${summaryRowNumber}:B${summaryRowNumber}`);
+	const summaryLabelCell = sheet.getCell(`A${summaryRowNumber}`);
+	summaryLabelCell.value = "Jumlah Karyawan Absen";
+	summaryLabelCell.font = { bold: true };
+	summaryLabelCell.alignment = { vertical: "middle", horizontal: "right" };
+	summaryLabelCell.fill = {
+		type: "pattern",
+		pattern: "solid",
+		fgColor: { argb: COLORS.summaryFill },
+	};
+
+	for (let i = 3; i <= headers.length; i++) {
+		const cell = summaryRow.getCell(i);
+		cell.fill = {
+			type: "pattern",
+			pattern: "solid",
+			fgColor: { argb: COLORS.summaryFill },
+		};
+		cell.border = {
+			top: { style: "thin" },
+			left: { style: "thin" },
+			bottom: { style: "thin" },
+			right: { style: "thin" },
+		};
+		cell.font = { bold: true };
+		cell.alignment = { vertical: "middle", horizontal: "center" };
+	}
+
+	for (let colNumber = 3; colNumber <= daysInMonth.length + 2; colNumber++) {
+		let absentCount = 0;
+		for (let rowNumber = 2; rowNumber < summaryRowNumber - 1; rowNumber++) {
+			if (sheet.getRow(rowNumber).getCell(colNumber).value === "-") {
+				absentCount++;
+			}
+		}
+		summaryRow.getCell(colNumber).value = absentCount;
+	}
+
+	const totalHadirColLetter = sheet.getColumn(headers.length).letter;
+	const totalHadirCell = summaryRow.getCell(headers.length);
+	totalHadirCell.value = {
+		formula: `SUM(${totalHadirColLetter}2:${totalHadirColLetter}${
+			summaryRowNumber - 2
+		})`,
+	};
 
 	return workbook;
 }
