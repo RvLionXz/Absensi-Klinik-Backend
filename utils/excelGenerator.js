@@ -4,6 +4,8 @@ const {
 	startOfMonth,
 	endOfMonth,
 	eachDayOfInterval,
+	getHours,
+	getMinutes,
 } = require("date-fns");
 const { id } = require("date-fns/locale");
 
@@ -57,10 +59,10 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 
 	const attendanceMap = new Map();
 	attendanceData.forEach((item) => {
-		const dateKey = format(new Date(item.waktu_absen), "yyyy-MM-dd");
-		const timeValue = format(new Date(item.waktu_absen), "HH:mm");
+		const date = new Date(item.waktu_absen);
+		const dateKey = format(date, "yyyy-MM-dd");
 		const mapKey = `${item.user_id}_${dateKey}`;
-		attendanceMap.set(mapKey, timeValue);
+		attendanceMap.set(mapKey, date);
 	});
 
 	allUsers.forEach((user) => {
@@ -77,7 +79,8 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 			const mapKey = `${user.id}_${dateString}`;
 
 			if (attendanceMap.has(mapKey)) {
-				rowData[dateKey] = attendanceMap.get(mapKey);
+				const attendanceTime = attendanceMap.get(mapKey);
+				rowData[dateKey] = format(attendanceTime, "HH:mm");
 				totalHadir++;
 			} else {
 				rowData[dateKey] = "-";
@@ -97,18 +100,44 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 
 			if (colNumber > 2 && colNumber <= daysInMonth.length + 2) {
 				if (cell.value !== "-") {
-					cell.font = { color: { argb: "FF006400" }, bold: true };
-					cell.fill = {
-						type: "pattern",
-						pattern: "solid",
-						fgColor: { argb: "FFC6EFCE" },
-					};
+					const dateString = headers[colNumber - 1].key.replace("day_", "");
+					const mapKey = `${user.id}_${dateString}`;
+					const attendanceTime = attendanceMap.get(mapKey);
+
+					if (attendanceTime) {
+						const hours = getHours(attendanceTime);
+						const minutes = getMinutes(attendanceTime);
+
+						let fontColor = "FF9C0006"; // Merah (Default telat)
+						let fillColor = "FFFFC7CE"; // Merah muda
+
+						if (
+							(hours === 8 && minutes === 0) ||
+							(hours === 18 && minutes === 0)
+						) {
+							fontColor = "FF006400"; // Hijau tua
+							fillColor = "FFC6EFCE"; // Hijau muda
+						} else if (
+							(hours === 8 && minutes >= 1 && minutes <= 10) ||
+							(hours === 18 && minutes >= 1 && minutes <= 10)
+						) {
+							fontColor = "FF9C5700"; // Oranye tua
+							fillColor = "FFFFEB9C"; // Kuning
+						}
+
+						cell.font = { color: { argb: fontColor }, bold: true };
+						cell.fill = {
+							type: "pattern",
+							pattern: "solid",
+							fgColor: { argb: fillColor },
+						};
+					}
 				} else {
-					cell.font = { color: { argb: "FF9C0006" } };
+					cell.font = { color: { argb: "000000" } };
 					cell.fill = {
 						type: "pattern",
 						pattern: "solid",
-						fgColor: { argb: "FFFFC7CE" },
+						fgColor: { argb: "FFFFFF" },
 					};
 				}
 			}

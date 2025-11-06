@@ -3,21 +3,9 @@ const { generateAttendanceReport } = require("../utils/excelGenerator");
 const { format } = require("date-fns");
 const { id } = require("date-fns/locale");
 
-const convertOffsetToMySqlFormat = (offsetMinutes) => {
-	if (offsetMinutes === 0) return "+00:00";
-	const sign = offsetMinutes > 0 ? "-" : "+";
-	const hours = Math.floor(Math.abs(offsetMinutes) / 60);
-	const minutes = Math.abs(offsetMinutes) % 60;
-	return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-		2,
-		"0"
-	)}`;
-};
-
 const rekamAbsensi = async (req, res) => {
-	const { koordinat, waktuAbsen, tzOffset } = req.body;
+	const { koordinat, waktuAbsen } = req.body;
 	const userId = req.user.userId;
-	const userTimezone = convertOffsetToMySqlFormat(parseInt(tzOffset, 10) || 0);
 
 	if (
 		!koordinat ||
@@ -33,10 +21,7 @@ const rekamAbsensi = async (req, res) => {
 		connection = await db.getConnection();
 		await connection.beginTransaction();
 
-		const checkSql = `
-      SELECT CASE WHEN last_absen_date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '${userTimezone}')) THEN 1 ELSE 0 END AS sudah_absen_hari_ini
-      FROM users WHERE id = ? FOR UPDATE
-    `;
+		const checkSql = `SELECT CASE WHEN last_absen_date = CURDATE() THEN 1 ELSE 0 END AS sudah_absen_hari_ini FROM users WHERE id = ? FOR UPDATE`;
 		const [users] = await connection.query(checkSql, [userId]);
 
 		if (users[0].sudah_absen_hari_ini === 1) {
@@ -46,7 +31,8 @@ const rekamAbsensi = async (req, res) => {
 				.json({ message: "Anda sudah melakukan absensi hari ini." });
 		}
 
-		const waktuAbsenMySQL = waktuAbsen.slice(0, 19).replace("T", " ");
+		const waktuAbsenMySQL = new Date(waktuAbsen);
+
 		const insertSql =
 			"INSERT INTO absensi (user_id, latitude, longitude, waktu_absen) VALUES (?, ?, ?, ?)";
 		const insertValues = [
@@ -57,7 +43,7 @@ const rekamAbsensi = async (req, res) => {
 		];
 		const [result] = await connection.query(insertSql, insertValues);
 
-		const updateSql = `UPDATE users SET last_absen_date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '${userTimezone}')) WHERE id = ?`;
+		const updateSql = `UPDATE users SET last_absen_date = CURDATE() WHERE id = ?`;
 		await connection.query(updateSql, [userId]);
 
 		await connection.commit();
@@ -79,14 +65,8 @@ const rekamAbsensi = async (req, res) => {
 
 const getAbsensiStatusToday = async (req, res) => {
 	const { userId } = req.user;
-	const { tzOffset } = req.query;
-	const userTimezone = convertOffsetToMySqlFormat(parseInt(tzOffset, 10) || 0);
-
 	try {
-		const sql = `
-      SELECT CASE WHEN last_absen_date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '${userTimezone}')) THEN 'sudah_absen' ELSE 'belum_absen' END AS status 
-      FROM users WHERE id = ?
-    `;
+		const sql = `SELECT CASE WHEN last_absen_date = CURDATE() THEN 'sudah_absen' ELSE 'belum_absen' END AS status FROM users WHERE id = ?`;
 		const [users] = await db.query(sql, [userId]);
 
 		if (users.length === 0)
@@ -96,7 +76,7 @@ const getAbsensiStatusToday = async (req, res) => {
 		let absensiData = null;
 
 		if (status === "sudah_absen") {
-			const dataSql = `SELECT * FROM absensi WHERE user_id = ? AND DATE(CONVERT_TZ(waktu_absen, "+00:00", '${userTimezone}')) = DATE(CONVERT_TZ(UTC_TIMESTAMP(), "+00:00", '${userTimezone}')) ORDER BY id DESC LIMIT 1`;
+			const dataSql = `SELECT * FROM absensi WHERE user_id = ? AND DATE(waktu_absen) = CURDATE() ORDER BY id DESC LIMIT 1`;
 			const [data] = await db.query(dataSql, [userId]);
 			absensiData = data[0] || null;
 		}
@@ -110,8 +90,6 @@ const getAbsensiStatusToday = async (req, res) => {
 
 const getAllAbsensi = async (req, res) => {
 	const { filter, date, month, year } = req.query;
-	const tzOffset = parseInt(req.query.tzOffset || "0", 10);
-	const userTimezone = convertOffsetToMySqlFormat(tzOffset);
 
 	let sql = `
     SELECT a.id, a.user_id, a.waktu_absen, a.latitude, a.longitude, u.nama_lengkap, u.jabatan 
@@ -119,23 +97,20 @@ const getAllAbsensi = async (req, res) => {
   `;
 	const params = [];
 
-	const userNow = `CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '${userTimezone}')`;
-	const userAbsenTime = `CONVERT_TZ(a.waktu_absen, '+00:00', '${userTimezone}')`;
-
 	switch (filter) {
 		case "today":
-			sql += `WHERE DATE(${userAbsenTime}) = DATE(${userNow})`;
+			sql += `WHERE DATE(a.waktu_absen) = CURDATE()`;
 			break;
 		case "month":
 			if (!month || !year)
 				return res.status(400).json({ message: "Bulan dan tahun diperlukan." });
-			sql += `WHERE YEAR(${userAbsenTime}) = ? AND MONTH(${userAbsenTime}) = ?`;
+			sql += `WHERE YEAR(a.waktu_absen) = ? AND MONTH(a.waktu_absen) = ?`;
 			params.push(year, month);
 			break;
 		case "date":
 			if (!date)
 				return res.status(400).json({ message: "Tanggal diperlukan." });
-			sql += `WHERE DATE(${userAbsenTime}) = ?`;
+			sql += `WHERE DATE(a.waktu_absen) = ?`;
 			params.push(date);
 			break;
 	}
@@ -152,8 +127,9 @@ const getAllAbsensi = async (req, res) => {
 
 const exportAbsensi = async (req, res) => {
 	const { month, year } = req.query;
-	if (!month || !year)
+	if (!month || !year) {
 		return res.status(400).json({ message: "Bulan dan tahun diperlukan." });
+	}
 
 	try {
 		const [allUsers] = await db.query(

@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 const whitelist = [
-	"https://<nama-proyek-anda>.vercel.app",
+	"https://absensi-klinik.vercel.app",
 	"http://localhost:5173",
 ];
 
@@ -27,7 +27,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// =================================================================
 
 app.use(express.json());
 
@@ -40,5 +39,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/absensi", absensiRoutes);
 
 app.listen(PORT, "0.0.0.0", () => {
-	console.log(`Server berjalan di http://localhost:${PORT}`);
+	console.log(
+		`Server berjalan di http://localhost:${PORT} dan bisa diakses dari luar`
+	);
 });
