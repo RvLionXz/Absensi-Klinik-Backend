@@ -168,7 +168,7 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 
 	sheet.mergeCells(`A${summaryRowNumber}:B${summaryRowNumber}`);
 	const summaryLabelCell = sheet.getCell(`A${summaryRowNumber}`);
-	summaryLabelCell.value = "Jumlah Karyawan Absen";
+	summaryLabelCell.value = "Jumlah Karyawan Hadir";
 	summaryLabelCell.font = { bold: true };
 	summaryLabelCell.alignment = { vertical: "middle", horizontal: "right" };
 	summaryLabelCell.fill = {
@@ -195,13 +195,13 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 	}
 
 	for (let colNumber = 3; colNumber <= daysInMonth.length + 2; colNumber++) {
-		let absentCount = 0;
+		let presentCount = 0;
 		for (let rowNumber = 2; rowNumber < summaryRowNumber - 1; rowNumber++) {
-			if (sheet.getRow(rowNumber).getCell(colNumber).value === "-") {
-				absentCount++;
+			if (sheet.getRow(rowNumber).getCell(colNumber).value !== "-") {
+				presentCount++;
 			}
 		}
-		summaryRow.getCell(colNumber).value = absentCount;
+		summaryRow.getCell(colNumber).value = presentCount;
 	}
 
 	const totalHadirColLetter = sheet.getColumn(headers.length).letter;
