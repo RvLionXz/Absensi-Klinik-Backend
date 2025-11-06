@@ -9,6 +9,16 @@ const {
 } = require("date-fns");
 const { id } = require("date-fns/locale");
 
+const COLORS = {
+	greenFill: "FFC6EFCE",
+	greenFont: "FF006400",
+	yellowFill: "FFFFEB9C",
+	yellowFont: "FF9C6500",
+	redFill: "FFFFC7CE",
+	redFont: "FF9C0006",
+	headerFill: "FFD3D3D3",
+};
+
 async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 	const workbook = new ExcelJS.Workbook();
 	const sheet = workbook.addWorksheet(
@@ -47,7 +57,7 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 		cell.fill = {
 			type: "pattern",
 			pattern: "solid",
-			fgColor: { argb: "FFD3D3D3" },
+			fgColor: { argb: COLORS.headerFill },
 		};
 		cell.border = {
 			top: { style: "thin" },
@@ -79,8 +89,7 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 			const mapKey = `${user.id}_${dateString}`;
 
 			if (attendanceMap.has(mapKey)) {
-				const attendanceTime = attendanceMap.get(mapKey);
-				rowData[dateKey] = format(attendanceTime, "HH:mm");
+				rowData[dateKey] = format(attendanceMap.get(mapKey), "HH:mm");
 				totalHadir++;
 			} else {
 				rowData[dateKey] = "-";
@@ -100,44 +109,48 @@ async function generateAttendanceReport(allUsers, attendanceData, month, year) {
 
 			if (colNumber > 2 && colNumber <= daysInMonth.length + 2) {
 				if (cell.value !== "-") {
-					const dateString = headers[colNumber - 1].key.replace("day_", "");
-					const mapKey = `${user.id}_${dateString}`;
-					const attendanceTime = attendanceMap.get(mapKey);
+					const timeParts = cell.value.split(":");
+					const hour = parseInt(timeParts[0], 10);
+					const minute = parseInt(timeParts[1], 10);
 
-					if (attendanceTime) {
-						const hours = getHours(attendanceTime);
-						const minutes = getMinutes(attendanceTime);
+					const isGreen =
+						(hour >= 7 && hour < 8) ||
+						(hour === 8 && minute === 0) ||
+						(hour >= 17 && hour < 18) ||
+						(hour === 18 && minute === 0);
 
-						let fontColor = "FF9C0006"; // Merah (Default telat)
-						let fillColor = "FFFFC7CE"; // Merah muda
+					const isYellow =
+						(hour === 8 && minute >= 1 && minute <= 10) ||
+						(hour === 18 && minute >= 1 && minute <= 10);
 
-						if (
-							(hours === 8 && minutes === 0) ||
-							(hours === 18 && minutes === 0)
-						) {
-							fontColor = "FF006400"; // Hijau tua
-							fillColor = "FFC6EFCE"; // Hijau muda
-						} else if (
-							(hours === 8 && minutes >= 1 && minutes <= 10) ||
-							(hours === 18 && minutes >= 1 && minutes <= 10)
-						) {
-							fontColor = "FF9C5700"; // Oranye tua
-							fillColor = "FFFFEB9C"; // Kuning
-						}
-
-						cell.font = { color: { argb: fontColor }, bold: true };
+					if (isGreen) {
+						cell.font = { color: { argb: COLORS.greenFont }, bold: true };
 						cell.fill = {
 							type: "pattern",
 							pattern: "solid",
-							fgColor: { argb: fillColor },
+							fgColor: { argb: COLORS.greenFill },
+						};
+					} else if (isYellow) {
+						cell.font = { color: { argb: COLORS.yellowFont }, bold: true };
+						cell.fill = {
+							type: "pattern",
+							pattern: "solid",
+							fgColor: { argb: COLORS.yellowFill },
+						};
+					} else {
+						cell.font = { color: { argb: COLORS.redFont }, bold: true };
+						cell.fill = {
+							type: "pattern",
+							pattern: "solid",
+							fgColor: { argb: COLORS.redFill },
 						};
 					}
 				} else {
-					cell.font = { color: { argb: "000000" } };
+					cell.font = { color: { argb: COLORS.redFont } };
 					cell.fill = {
 						type: "pattern",
 						pattern: "solid",
-						fgColor: { argb: "FFFFFF" },
+						fgColor: { argb: COLORS.redFill },
 					};
 				}
 			}
